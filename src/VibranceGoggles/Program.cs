@@ -46,6 +46,7 @@ namespace VibranceGoggles
 
                     // With --minimized (Windows startup) it just stays in the tray.
                     if (!minimized) form.ShowCentered();
+                    else MemoryTrim.Soon(3000); // Started with Windows: stay small in the tray.
 
                     Application.Run();
                     restart = form.RestartRequested;

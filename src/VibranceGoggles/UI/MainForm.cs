@@ -212,6 +212,7 @@ namespace VibranceGoggles.UI
             {
                 e.Cancel = true;
                 Hide();
+                MemoryTrim.Soon();
                 if (!_settings.TrayHintShown)
                 {
                     _tray.ShowBalloonTip(3000, S.AppName, S.TrayHint, ToolTipIcon.Info);
