@@ -51,6 +51,7 @@ namespace VibranceGoggles
                     restart = form.RestartRequested;
                 }
 
+                AppIcons.DisposeAll();
                 mutex.ReleaseMutex();
             }
 

@@ -1,61 +1,38 @@
-# Generates assets/icon.ico (16-256 px) for Vibrance Goggles.
-# Run from the repo root:  pwsh -NoProfile -File tools/make-icon.ps1
-Add-Type -AssemblyName System.Drawing
+# Keeps assets/icon.ico in sync with assets/icon-dark.ico.
+#
+# The icons are designed outside this repo; nothing here generates or redraws them.
+#   assets/icon-dark.ico   window + tray icon when Windows uses dark mode (embedded in the .exe)
+#   assets/icon-light.ico  window + tray icon when Windows uses light mode (embedded in the .exe)
+#   assets/icon.ico        fixed icon of the .exe, the MSI installer and the shortcuts = copy of icon-dark.ico
+#
+# Usage (from the repo root):
+#   pwsh -NoProfile -File tools/make-icon.ps1          # copies icon-dark.ico over icon.ico if they differ
+#   pwsh -NoProfile -File tools/make-icon.ps1 -Check   # only verifies; exit code 1 if out of sync
 
-$out = Join-Path $PSScriptRoot '..\assets\icon.ico'
-$sizes = 16, 24, 32, 48, 64, 128, 256
+param([switch]$Check)
 
-function New-IconPng([int]$s) {
-    $bmp = New-Object System.Drawing.Bitmap $s, $s
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = 'AntiAlias'
-    $g.Clear([System.Drawing.Color]::Transparent)
+$assets = Join-Path $PSScriptRoot '..\assets'
+$dark = Join-Path $assets 'icon-dark.ico'
+$light = Join-Path $assets 'icon-light.ico'
+$fixed = Join-Path $assets 'icon.ico'
 
-    # Rounded tile with a vivid diagonal gradient.
-    $r = [Math]::Max(2, $s * 0.22)
-    $rect = New-Object System.Drawing.RectangleF 0, 0, ($s - 1), ($s - 1)
-    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $path.AddArc($rect.X, $rect.Y, $r * 2, $r * 2, 180, 90)
-    $path.AddArc($rect.Right - $r * 2, $rect.Y, $r * 2, $r * 2, 270, 90)
-    $path.AddArc($rect.Right - $r * 2, $rect.Bottom - $r * 2, $r * 2, $r * 2, 0, 90)
-    $path.AddArc($rect.X, $rect.Bottom - $r * 2, $r * 2, $r * 2, 90, 90)
-    $path.CloseFigure()
-    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush $rect, ([System.Drawing.Color]::FromArgb(255, 124, 58, 237)), ([System.Drawing.Color]::FromArgb(255, 255, 94, 58)), 45.0
-    $blend = New-Object System.Drawing.Drawing2D.ColorBlend 3
-    $blend.Colors = @([System.Drawing.Color]::FromArgb(255, 99, 102, 241), [System.Drawing.Color]::FromArgb(255, 236, 72, 153), [System.Drawing.Color]::FromArgb(255, 251, 146, 60))
-    $blend.Positions = @(0.0, 0.5, 1.0)
-    $brush.InterpolationColors = $blend
-    $g.FillPath($brush, $path)
-
-    # Goggles: two lenses joined by a bridge.
-    $lens = $s * 0.30
-    $cy = $s * 0.50
-    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), ([Math]::Max(1.5, $s * 0.075))
-    $fill = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(70, 255, 255, 255))
-    foreach ($cx in ($s * 0.31), ($s * 0.69)) {
-        $g.FillEllipse($fill, $cx - $lens / 2, $cy - $lens / 2, $lens, $lens)
-        $g.DrawEllipse($pen, $cx - $lens / 2, $cy - $lens / 2, $lens, $lens)
-    }
-    $g.DrawLine($pen, $s * 0.31 + $lens / 2, $cy, $s * 0.69 - $lens / 2, $cy)
-
-    $ms = New-Object System.IO.MemoryStream
-    $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    $g.Dispose(); $bmp.Dispose()
-    return , $ms.ToArray()
+foreach ($f in $dark, $light) {
+    if (-not (Test-Path $f)) { Write-Error "Missing $f"; exit 1 }
+    $bytes = [System.IO.File]::ReadAllBytes($f)
+    if ($bytes.Length -lt 6 -or [BitConverter]::ToUInt16($bytes, 2) -ne 1) { Write-Error "$f is not a valid .ico file"; exit 1 }
 }
 
-$images = foreach ($s in $sizes) { , (New-IconPng $s) }
+$inSync = (Test-Path $fixed) -and ((Get-FileHash $fixed).Hash -eq (Get-FileHash $dark).Hash)
 
-$fs = [System.IO.File]::Create($out)
-$w = New-Object System.IO.BinaryWriter $fs
-$w.Write([uint16]0); $w.Write([uint16]1); $w.Write([uint16]$sizes.Count)
-$offset = 6 + 16 * $sizes.Count
-for ($i = 0; $i -lt $sizes.Count; $i++) {
-    $s = $sizes[$i]; $len = $images[$i].Length
-    $w.Write([byte]($s % 256)); $w.Write([byte]($s % 256)); $w.Write([byte]0); $w.Write([byte]0)
-    $w.Write([uint16]1); $w.Write([uint16]32); $w.Write([uint32]$len); $w.Write([uint32]$offset)
-    $offset += $len
+if ($inSync) {
+    Write-Host 'assets/icon.ico is in sync with assets/icon-dark.ico'
+    exit 0
 }
-foreach ($img in $images) { $w.Write($img) }
-$w.Close()
-Write-Host "Wrote $out"
+
+if ($Check) {
+    Write-Host 'assets/icon.ico differs from assets/icon-dark.ico. Run tools/make-icon.ps1 to sync it.' -ForegroundColor Red
+    exit 1
+}
+
+Copy-Item $dark $fixed -Force
+Write-Host 'Copied assets/icon-dark.ico -> assets/icon.ico'

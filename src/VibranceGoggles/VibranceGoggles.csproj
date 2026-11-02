@@ -14,13 +14,19 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
 
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>Vibrance Goggles</Product>
     <Description>Digital vibrance (saturation) booster for Intel and AMD integrated graphics.</Description>
     <Company>Joel Arbaiza</Company>
     <Authors>Joel Arbaiza</Authors>
     <Copyright>Copyright (c) 2026 Joel Arbaiza</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Window / tray icons that follow the Windows light or dark mode (loaded by UI/AppIcons.cs). -->
+    <EmbeddedResource Include="..\..\assets\icon-dark.ico" LogicalName="VibranceGoggles.Icons.Dark.ico" />
+    <EmbeddedResource Include="..\..\assets\icon-light.ico" LogicalName="VibranceGoggles.Icons.Light.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />

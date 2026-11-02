@@ -44,7 +44,7 @@ namespace VibranceGoggles.UI
             SuspendLayout();
             AutoScaleMode = AutoScaleMode.None; // Sizes below go through Dpi.Px instead.
             Text = S.AppName;
-            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            Icon = AppIcons.Current;
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             AutoSize = true;
@@ -84,8 +84,12 @@ namespace VibranceGoggles.UI
             // Columns always fill the list, so no unpainted (white) header area is left on the right.
             _gameList.ClientSizeChanged += (s, e) =>
                 _gameList.Columns[0].Width = Math.Max(Dpi.Px(120), _gameList.ClientSize.Width - _gameList.Columns[1].Width);
-            _gameList.DrawItem += (s, e) => e.DrawDefault = true;
-            _gameList.DrawSubItem += (s, e) => e.DrawDefault = true;
+            // Rows are painted with theme colors: the default hover highlight is light with dark text,
+            // which is unreadable in dark mode.
+            _gameList.DrawItem += (s, e) => { };
+            _gameList.DrawSubItem += DrawGameCell;
+            _gameList.MouseMove += (s, e) => SetHoverRow(_gameList.GetItemAt(e.X, e.Y));
+            _gameList.MouseLeave += (s, e) => SetHoverRow(null);
             var gamesHint = new Label { Text = S.GamesHint, AutoSize = true, Tag = Theme.Subtle, Margin = new Padding(3, 2, 3, 0) };
 
             var addButton = new Button { Text = S.Add, AutoSize = true };
@@ -160,7 +164,7 @@ namespace VibranceGoggles.UI
             trayMenu.Items.Add(new ToolStripSeparator());
             trayMenu.Items.Add(S.Exit, null, (s, e) => ExitApp());
             _trayMenu = trayMenu;
-            _tray = new NotifyIcon { Icon = Icon, Text = S.AppName, ContextMenuStrip = trayMenu, Visible = true };
+            _tray = new NotifyIcon { Icon = AppIcons.Current, Text = S.AppName, ContextMenuStrip = trayMenu, Visible = true };
             _tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowCentered(); };
 
             // --- Events -------------------------------------------------------------------------------
@@ -330,6 +334,48 @@ namespace VibranceGoggles.UI
             SaveAndRefresh();
         }
 
+        private ListViewItem _hoverRow;
+
+        private void SetHoverRow(ListViewItem item)
+        {
+            if (ReferenceEquals(item, _hoverRow)) return;
+            ListViewItem old = _hoverRow;
+            _hoverRow = item;
+            if (old != null && old.ListView != null) _gameList.Invalidate(old.Bounds);
+            if (item != null) _gameList.Invalidate(item.Bounds);
+        }
+
+        /// <summary>Paints one cell: theme background (normal / hover / selected), checkbox and text.</summary>
+        private void DrawGameCell(object sender, DrawListViewSubItemEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Color back = e.Item.Selected ? Theme.RowSelected
+                       : ReferenceEquals(e.Item, _hoverRow) ? Theme.RowHover
+                       : Theme.Surface;
+            using (var b = new SolidBrush(back)) g.FillRectangle(b, e.Bounds);
+
+            bool enabled = ((GameEntry)e.Item.Tag).Enabled;
+            Color text = enabled ? Theme.Text : Theme.SubtleText;
+            if (e.Item.Selected && !Theme.IsDark) text = SystemColors.ControlText;
+
+            Rectangle textBounds = Rectangle.Inflate(e.Bounds, -Dpi.Px(6), 0);
+            if (e.ColumnIndex == 0)
+            {
+                var state = e.Item.Checked
+                    ? System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal
+                    : System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal;
+                Size glyph = CheckBoxRenderer.GetGlyphSize(g, state);
+                var at = new Point(e.Bounds.X + Dpi.Px(4), e.Bounds.Y + (e.Bounds.Height - glyph.Height) / 2);
+                CheckBoxRenderer.DrawCheckBox(g, at, state);
+                textBounds = new Rectangle(at.X + glyph.Width + Dpi.Px(6), e.Bounds.Y,
+                                           e.Bounds.Right - at.X - glyph.Width - Dpi.Px(10), e.Bounds.Height);
+            }
+
+            var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine |
+                        (e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left);
+            TextRenderer.DrawText(g, e.SubItem.Text, _gameList.Font, textBounds, text, flags);
+        }
+
         private void DrawListHeader(object sender, DrawListViewColumnHeaderEventArgs e)
         {
             using (var back = new SolidBrush(Theme.HeaderBack))
@@ -349,7 +395,17 @@ namespace VibranceGoggles.UI
 
         private void ApplyTheme()
         {
+            if (IsDisposed || Disposing || _exiting) return;
             Theme.Apply(this);
+
+            // Window and tray icon follow light/dark too (cached icons, no new handles per change).
+            Icon icon = AppIcons.Current;
+            if (!ReferenceEquals(Icon, icon))
+            {
+                Icon = icon;
+                if (_tray != null) _tray.Icon = icon;
+                Log.Write("Icon variant: " + (Theme.IsDark ? "dark" : "light"));
+            }
             _trayMenu.Renderer = Theme.MenuRenderer();
             foreach (ToolStripItem i in _trayMenu.Items) i.ForeColor = Theme.IsDark ? Theme.Text : SystemColors.ControlText;
             foreach (ListViewItem item in _gameList.Items) StyleItem(item);
@@ -359,13 +415,14 @@ namespace VibranceGoggles.UI
         private void OnUserPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
         {
             // Raised on a system thread when Windows switches between light and dark.
-            if (Theme.Refresh() && IsHandleCreated) BeginInvoke(new Action(ApplyTheme));
+            if (Theme.Refresh() && IsHandleCreated && !IsDisposed) BeginInvoke(new Action(ApplyTheme));
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
             ApplyTheme(); // Child handles exist now (list scrollbars, title bar).
+            ActiveControl = null; // No focus rectangle on the first slider when the window opens.
         }
 
         private static void OpenRepo()

@@ -11,6 +11,19 @@ Windows 10 · Windows 11 · Intel HD / UHD / Iris · AMD Radeon (Vega, RDNA)
 
 [**Download the latest release**](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) · [Español](#español)
 
+<table>
+  <tr>
+    <th>Dark mode</th>
+    <th>Light mode</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dark.png" width="400" alt="Vibrance Goggles in Windows dark mode"></td>
+    <td><img src="docs/screenshots/light.png" width="400" alt="Vibrance Goggles in Windows light mode"></td>
+  </tr>
+</table>
+
+<sub>The app follows your Windows theme automatically.</sub>
+
 </div>
 
 ---
@@ -23,7 +36,7 @@ Vibrance Goggles fills that gap:
 - 🖥️ **Normal colors on the desktop**: it switches back as soon as you alt-tab.
 - ✅ **Pause a game without removing it**: just uncheck it in the list.
 - ↺ **One-click reset** to normal colors (100 %) on every slider.
-- 🌙 **Dark mode** that follows Windows automatically, even while the app is open.
+- 🌙 **Dark mode** that follows Windows automatically, even while the app is open. The window and tray icon switch between a dark and a light variant too.
 - ⌨️ **Custom hotkey**: toggle vibrance on and off from inside the game (default `Ctrl + Alt + V`).
 - 🚀 **Start with Windows**, minimized to the tray.
 - 🧩 **No manual DLL copying**: the Intel interface is generated from your installed driver at startup.
@@ -99,7 +112,7 @@ Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) b
 - La ventana siempre se abre centrada.
 - Activa o desactiva cada juego con su casilla, sin quitarlo de la lista.
 - Botón ↺ para volver al 100% en cada barra.
-- Modo oscuro automático, igual que Windows.
+- Modo oscuro automático, igual que Windows; el icono de la ventana y de la bandeja también cambia entre su versión oscura y clara.
 - 13 idiomas; usa el de tu Windows o elígelo en Opciones.
 
 **Instalación:** descarga el instalador `.msi` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) y ejecútalo (no pide permisos de administrador). También hay una versión portable en `.zip`. Luego pulsa **Agregar juego…**, elige el juego y ajusta su saturación.

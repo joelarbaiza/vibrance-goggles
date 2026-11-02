@@ -18,6 +18,7 @@ namespace VibranceGoggles.UI
             AutoScaleMode = AutoScaleMode.None;
             Font = System.Drawing.SystemFonts.MessageBoxFont;
             Text = S.AddTitle;
+            Icon = AppIcons.Current;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = MinimizeBox = false;

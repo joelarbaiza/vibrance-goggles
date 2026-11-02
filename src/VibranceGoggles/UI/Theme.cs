@@ -25,6 +25,8 @@ namespace VibranceGoggles.UI
         public static Color Border => IsDark ? Color.FromArgb(70, 70, 70) : SystemColors.ControlDark;
         public static Color Link => IsDark ? Color.FromArgb(110, 180, 255) : Color.FromArgb(0, 102, 204);
         public static Color HeaderBack => IsDark ? Color.FromArgb(38, 38, 38) : SystemColors.Control;
+        public static Color RowHover => IsDark ? Color.FromArgb(58, 58, 58) : Color.FromArgb(232, 240, 250);
+        public static Color RowSelected => IsDark ? Color.FromArgb(0, 84, 153) : Color.FromArgb(204, 228, 247);
 
         /// <summary>Re-reads the Windows setting; returns true if it changed.</summary>
         public static bool Refresh()
