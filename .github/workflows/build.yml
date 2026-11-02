@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build src/VibranceGoggles/VibranceGoggles.csproj -c Release -nologo
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}'.TrimStart('v') } else { 'dev' }
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $zip = "artifacts/VibranceGoggles-$version.zip"
+          Compress-Archive -Path src/VibranceGoggles/bin/Release/VibranceGoggles.exe, src/VibranceGoggles/bin/Release/VibranceGoggles.exe.config, LICENSE -DestinationPath $zip -Force
+          "ZIP=$zip" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VibranceGoggles
+          path: ${{ env.ZIP }}
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" "${{ env.ZIP }}" --title "Vibrance Goggles ${{ github.ref_name }}" --generate-notes

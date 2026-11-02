@@ -1,0 +1,389 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+using VibranceGoggles.Gpu;
+
+namespace VibranceGoggles.UI
+{
+    internal sealed class MainForm : Form
+    {
+        private const int WM_HOTKEY = 0x0312;
+        private const int HotkeyId = 0x5647; // "VG"
+        private const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_SHIFT = 0x4, MOD_NOREPEAT = 0x4000;
+
+        private readonly AppSettings _settings;
+        private readonly GpuManager _gpu;
+        private readonly VibranceEngine _engine;
+
+        private readonly NotifyIcon _tray;
+        private readonly ToolStripMenuItem _trayToggle;
+        private readonly VibranceSlider _desktopSlider;
+        private readonly VibranceSlider _gameSlider;
+        private readonly ListView _gameList;
+        private readonly Button _removeButton;
+        private readonly CheckBox _chkEnabled, _chkFocused, _chkStartup;
+        private readonly HotkeyBox _hotkeyBox;
+        private readonly Label _hotkeyStatus;
+        private readonly Label _status;
+
+        private bool _loading;
+        private bool _exiting;
+
+        public MainForm(AppSettings settings, GpuManager gpu)
+        {
+            _settings = settings;
+            _gpu = gpu;
+            _engine = new VibranceEngine(settings, gpu);
+
+            SuspendLayout();
+            AutoScaleMode = AutoScaleMode.None; // Sizes below go through Dpi.Px instead.
+            Text = S.AppName;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            StartPosition = FormStartPosition.Manual; // We center it ourselves, every time it is shown.
+            Padding = new Padding(Dpi.Px(10));
+            Font = SystemFonts.MessageBoxFont;
+
+            var root = new TableLayoutPanel { ColumnCount = 1, AutoSize = true };
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Dpi.Px(430)));
+
+            // --- Graphics adapter -----------------------------------------------------------------
+            var gpuLabel = new Label
+            {
+                AutoSize = true,
+                MaximumSize = new Size(Dpi.Px(420), 0),
+                Margin = new Padding(3, 0, 3, 8),
+                Text = gpu.HasGpu ? $"{S.Graphics}: {gpu.Description}" : S.NoGpu,
+                ForeColor = gpu.HasGpu ? SystemColors.GrayText : Color.Firebrick,
+            };
+            root.Controls.Add(gpuLabel);
+
+            // --- Desktop ------------------------------------------------------------------------------
+            _desktopSlider = new VibranceSlider { Dock = DockStyle.Fill };
+            root.Controls.Add(Group(S.Desktop, _desktopSlider));
+
+            // --- Games --------------------------------------------------------------------------------
+            _gameList = new ListView
+            {
+                View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = false,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable, Height = Dpi.Px(130), Dock = DockStyle.Fill,
+            };
+            _gameList.Columns.Add(S.Game, Dpi.Px(290));
+            _gameList.Columns.Add(S.Vibrance, Dpi.Px(90), HorizontalAlignment.Right);
+
+            var addButton = new Button { Text = S.Add, AutoSize = true };
+            _removeButton = new Button { Text = S.Remove, AutoSize = true, Enabled = false };
+            var gameButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4) };
+            gameButtons.Controls.Add(addButton);
+            gameButtons.Controls.Add(_removeButton);
+
+            _gameSlider = new VibranceSlider { Dock = DockStyle.Fill, Enabled = false };
+            var gamesPanel = Stack(_gameList, gameButtons,
+                new Label { Text = S.SelectedGame, AutoSize = true, Margin = new Padding(3, 4, 3, 0) }, _gameSlider);
+            root.Controls.Add(Group(S.Games, gamesPanel));
+
+            // --- Options ------------------------------------------------------------------------------
+            _chkEnabled = new CheckBox { Text = S.Enabled, AutoSize = true };
+            _chkFocused = new CheckBox { Text = S.OnlyFocused, AutoSize = true };
+            _chkStartup = new CheckBox { Text = S.StartWithWindows, AutoSize = true };
+
+
+            _hotkeyBox = new HotkeyBox { Width = Dpi.Px(170) };
+            _hotkeyStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Text = S.HotkeyHint };
+            var hotkeyRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
+            hotkeyRow.Controls.Add(new Label { Text = S.Hotkey + ":", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 0) });
+            hotkeyRow.Controls.Add(_hotkeyBox);
+
+            root.Controls.Add(Group(S.Options,
+                Stack(_chkEnabled, _chkFocused, _chkStartup, hotkeyRow, _hotkeyStatus)));
+
+            // --- Status -------------------------------------------------------------------------------
+            _status = new Label { AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = new Padding(3, 6, 3, 0), Font = new Font(Font, FontStyle.Bold) };
+            root.Controls.Add(_status);
+
+            Controls.Add(root);
+            ResumeLayout(true);
+
+            // --- Tray ---------------------------------------------------------------------------------
+            _trayToggle = new ToolStripMenuItem();
+            _trayToggle.Click += (s, e) => SetEnabled(!_settings.Enabled, notify: false);
+            var trayMenu = new ContextMenuStrip();
+            trayMenu.Items.Add(S.Open, null, (s, e) => ShowCentered());
+            trayMenu.Items.Add(_trayToggle);
+            trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add(S.Exit, null, (s, e) => ExitApp());
+            _tray = new NotifyIcon { Icon = Icon, Text = S.AppName, ContextMenuStrip = trayMenu, Visible = true };
+            _tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowCentered(); };
+
+            // --- Events -------------------------------------------------------------------------------
+            _desktopSlider.ValueChanged += (s, e) => { if (_loading) return; _settings.DesktopVibrance = _desktopSlider.Value; SaveAndRefresh(); };
+            _gameSlider.ValueChanged += (s, e) => OnGameVibranceChanged();
+            _gameList.SelectedIndexChanged += (s, e) => OnGameSelected();
+            addButton.Click += (s, e) => AddGame();
+            _removeButton.Click += (s, e) => RemoveGame();
+            _chkEnabled.CheckedChanged += (s, e) => { if (!_loading) SetEnabled(_chkEnabled.Checked, notify: false); };
+            _chkFocused.CheckedChanged += (s, e) => { if (_loading) return; _settings.OnlyWhenFocused = _chkFocused.Checked; SaveAndRefresh(); };
+            _chkStartup.CheckedChanged += (s, e) => { if (_loading) return; _settings.StartWithWindows = _chkStartup.Checked; ApplyAutostart(); _settings.Save(); };
+
+            _hotkeyBox.HotkeyChanged += (s, e) => { _settings.Hotkey = (int)_hotkeyBox.Hotkey; _settings.Save(); RegisterToggleHotkey(); };
+            _engine.StateChanged += (s, e) => UpdateStatus();
+
+            LoadValues();
+            if (_settings.StartWithWindows) ApplyAutostart(); // Keep the path current if the exe moved.
+
+            CreateHandle(); // Needed for the hotkey even while hidden in the tray.
+            RegisterToggleHotkey();
+            _engine.Start();
+        }
+
+        // =============================================================================== Window
+
+        /// <summary>Show the window in the middle of the screen the mouse is on.</summary>
+        public void ShowCentered()
+        {
+            if (!Visible)
+            {
+                Rectangle area = Screen.FromPoint(Cursor.Position).WorkingArea;
+                Location = new Point(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
+                Show();
+            }
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!_exiting && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                Hide();
+                if (!_settings.TrayHintShown)
+                {
+                    _tray.ShowBalloonTip(3000, S.AppName, S.TrayHint, ToolTipIcon.Info);
+                    _settings.TrayHintShown = true;
+                    _settings.Save();
+                }
+                return;
+            }
+            // Windows shutdown, sign-out, Task Manager: put normal colors back before leaving.
+            if (!_exiting) _engine.Restore();
+            base.OnFormClosing(e);
+        }
+
+        private void ExitApp()
+        {
+            _exiting = true;
+            _engine.Restore();
+            UnregisterHotKey(Handle, HotkeyId);
+            _tray.Visible = false;
+            _tray.Dispose();
+            _engine.Dispose();
+            Close();
+            Application.Exit();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HotkeyId)
+                SetEnabled(!_settings.Enabled, notify: true);
+            base.WndProc(ref m);
+        }
+
+        // =============================================================================== Values
+
+        private void LoadValues()
+        {
+            _loading = true;
+            ApplyRange();
+            _desktopSlider.Value = _settings.DesktopVibrance;
+            _chkEnabled.Checked = _settings.Enabled;
+            _chkFocused.Checked = _settings.OnlyWhenFocused;
+            _chkStartup.Checked = _settings.StartWithWindows;
+
+            _hotkeyBox.Hotkey = (Keys)_settings.Hotkey;
+
+            _gameList.Items.Clear();
+            foreach (GameEntry game in _settings.Games) _gameList.Items.Add(ItemFor(game));
+            _loading = false;
+            UpdateToggleTexts();
+        }
+
+        private void ApplyRange()
+        {
+            int max = _gpu.MaxVibrance;
+            _desktopSlider.Maximum = max;
+            _gameSlider.Maximum = max;
+            foreach (GameEntry g in _settings.Games) g.Vibrance = Math.Min(g.Vibrance, max);
+            _settings.DesktopVibrance = Math.Min(_settings.DesktopVibrance, max);
+            foreach (ListViewItem item in _gameList.Items) item.SubItems[1].Text = ((GameEntry)item.Tag).Vibrance + " %";
+        }
+
+        private void SaveAndRefresh()
+        {
+            _settings.Save();
+            _engine.Refresh();
+        }
+
+        private void SetEnabled(bool enabled, bool notify)
+        {
+            _settings.Enabled = enabled;
+            _loading = true;
+            _chkEnabled.Checked = enabled;
+            _loading = false;
+            UpdateToggleTexts();
+            SaveAndRefresh();
+            if (notify) _tray.ShowBalloonTip(1500, S.AppName, enabled ? S.ToggledOn : S.ToggledOff, ToolTipIcon.None);
+        }
+
+        private void UpdateToggleTexts()
+        {
+            string hotkey = _settings.Hotkey != 0 ? $"\t{HotkeyBox.Describe((Keys)_settings.Hotkey)}" : "";
+            _trayToggle.Text = (_settings.Enabled ? S.Disable : S.Enable) + hotkey;
+            UpdateStatus();
+        }
+
+        private void UpdateStatus()
+        {
+            string text;
+            if (!_settings.Enabled) text = $"{S.StatusDisabled} · {_settings.DesktopVibrance} %";
+            else if (_engine.ActiveGame != null) text = $"▶ {_engine.ActiveGame.Process} · {_engine.ActiveGame.Vibrance} %";
+            else text = $"{S.StatusDesktop} · {_settings.DesktopVibrance} %";
+
+            _status.Text = text;
+            string tip = $"{S.AppName} — {text}";
+            _tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
+        }
+
+        // =============================================================================== Games
+
+        private static ListViewItem ItemFor(GameEntry game) =>
+            new ListViewItem(new[] { game.Process, game.Vibrance + " %" }) { Tag = game };
+
+        private GameEntry SelectedGame => _gameList.SelectedItems.Count > 0 ? (GameEntry)_gameList.SelectedItems[0].Tag : null;
+
+        private void OnGameSelected()
+        {
+            GameEntry game = SelectedGame;
+            _removeButton.Enabled = game != null;
+            _gameSlider.Enabled = game != null;
+            if (game != null)
+            {
+                _loading = true;
+                _gameSlider.Value = game.Vibrance;
+                _loading = false;
+            }
+        }
+
+        private void OnGameVibranceChanged()
+        {
+            GameEntry game = SelectedGame;
+            if (_loading || game == null) return;
+            game.Vibrance = _gameSlider.Value;
+            _gameList.SelectedItems[0].SubItems[1].Text = game.Vibrance + " %";
+            SaveAndRefresh();
+        }
+
+        private void AddGame()
+        {
+            using (var dialog = new AddGameDialog())
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+                GameEntry game = _settings.FindGame(System.IO.Path.GetFileNameWithoutExtension(dialog.ProcessFile));
+                if (game == null)
+                {
+                    game = new GameEntry { Process = dialog.ProcessFile, Vibrance = Math.Min(150, _gameSlider.Maximum) };
+                    _settings.Games.Add(game);
+                    _gameList.Items.Add(ItemFor(game));
+                    SaveAndRefresh();
+                }
+
+                foreach (ListViewItem item in _gameList.Items)
+                {
+                    if (item.Tag == game) { item.Selected = true; item.EnsureVisible(); }
+                }
+                _gameList.Focus();
+            }
+        }
+
+        private void RemoveGame()
+        {
+            GameEntry game = SelectedGame;
+            if (game == null) return;
+            _settings.Games.Remove(game);
+            _gameList.SelectedItems[0].Remove();
+            SaveAndRefresh();
+        }
+
+        // =============================================================================== System
+
+        private void ApplyAutostart()
+        {
+            try { Autostart.Apply(_settings.StartWithWindows); }
+            catch (Exception ex) { Log.Write("Autostart failed: " + ex.Message); }
+        }
+
+        private void RegisterToggleHotkey()
+        {
+            UnregisterHotKey(Handle, HotkeyId);
+            var keys = (Keys)_settings.Hotkey;
+            bool ok = true;
+
+            if (keys != Keys.None)
+            {
+                uint mods = MOD_NOREPEAT;
+                if ((keys & Keys.Control) != 0) mods |= MOD_CONTROL;
+                if ((keys & Keys.Alt) != 0) mods |= MOD_ALT;
+                if ((keys & Keys.Shift) != 0) mods |= MOD_SHIFT;
+                ok = RegisterHotKey(Handle, HotkeyId, mods, (uint)(keys & Keys.KeyCode));
+            }
+
+            _hotkeyStatus.Text = ok ? S.HotkeyHint : S.HotkeyBusy;
+            _hotkeyStatus.ForeColor = ok ? SystemColors.GrayText : Color.Firebrick;
+            UpdateToggleTexts();
+        }
+
+        // =============================================================================== Layout helpers
+
+        private static GroupBox Group(string title, Control content)
+        {
+            var box = new GroupBox
+            {
+                Text = title, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Fill, Padding = new Padding(8, 6, 8, 8), Margin = new Padding(0, 0, 0, 8),
+            };
+            content.Dock = DockStyle.Fill;
+            box.Controls.Add(content);
+            return box;
+        }
+
+        private static TableLayoutPanel Stack(params Control[] controls)
+        {
+            var panel = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, Margin = new Padding(0) };
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            foreach (Control c in controls) panel.Controls.Add(c);
+            return panel;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _tray?.Dispose();
+                _engine?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll")]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    }
+}
