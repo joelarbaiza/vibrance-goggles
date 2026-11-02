@@ -24,7 +24,6 @@ Vibrance Goggles fills that gap:
 - ✅ **Pause a game without removing it**: just uncheck it in the list.
 - ↺ **One-click reset** to normal colors (100 %) on every slider.
 - 🌙 **Dark mode** that follows Windows automatically, even while the app is open.
-- ✨ **Modern Windows 11 look**: rounded cards, buttons, inputs and sliders.
 - ⌨️ **Custom hotkey**: toggle vibrance on and off from inside the game (default `Ctrl + Alt + V`).
 - 🚀 **Start with Windows**, minimized to the tray.
 - 🧩 **No manual DLL copying**: the Intel interface is generated from your installed driver at startup.
@@ -101,7 +100,6 @@ Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) b
 - Activa o desactiva cada juego con su casilla, sin quitarlo de la lista.
 - Botón ↺ para volver al 100% en cada barra.
 - Modo oscuro automático, igual que Windows.
-- Diseño moderno estilo Windows 11, con bordes redondeados.
 - 13 idiomas; usa el de tu Windows o elígelo en Opciones.
 
 **Instalación:** descarga el instalador `.msi` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) y ejecútalo (no pide permisos de administrador). También hay una versión portable en `.zip`. Luego pulsa **Agregar juego…**, elige el juego y ajusta su saturación.
