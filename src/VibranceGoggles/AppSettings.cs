@@ -36,6 +36,9 @@ namespace VibranceGoggles
 
         public bool TrayHintShown { get; set; }
 
+        /// <summary>UI language code ("es", "de", ...). Empty = same as Windows.</summary>
+        public string Language { get; set; } = "";
+
         public List<GameEntry> Games { get; set; } = new List<GameEntry>();
 
         // ------------------------------------------------------------------------------------------

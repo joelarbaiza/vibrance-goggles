@@ -31,6 +31,9 @@ namespace VibranceGoggles.UI
         private bool _loading;
         private bool _exiting;
 
+        /// <summary>Set when the app should start again after exiting (language change).</summary>
+        public bool RestartRequested { get; private set; }
+
         public MainForm(AppSettings settings, GpuManager gpu)
         {
             _settings = settings;
@@ -92,6 +95,21 @@ namespace VibranceGoggles.UI
             _chkFocused = new CheckBox { Text = S.OnlyFocused, AutoSize = true };
             _chkStartup = new CheckBox { Text = S.StartWithWindows, AutoSize = true };
 
+            var languageBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) };
+            languageBox.Items.Add(S.LanguageAuto);
+            languageBox.Items.AddRange(S.NativeNames);
+            int langIndex = Array.IndexOf(S.Codes, _settings.Language ?? "");
+            languageBox.SelectedIndex = langIndex >= 0 ? langIndex + 1 : 0;
+            languageBox.SelectedIndexChanged += (s, e) =>
+            {
+                _settings.Language = languageBox.SelectedIndex == 0 ? "" : S.Codes[languageBox.SelectedIndex - 1];
+                _settings.Save();
+                RestartRequested = true; // Rebuild the UI in the new language.
+                ExitApp();
+            };
+            var languageRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
+            languageRow.Controls.Add(new Label { Text = S.Language + ":", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            languageRow.Controls.Add(languageBox);
 
             _hotkeyBox = new HotkeyBox { Width = Dpi.Px(170) };
             _hotkeyStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Text = S.HotkeyHint };
@@ -100,7 +118,7 @@ namespace VibranceGoggles.UI
             hotkeyRow.Controls.Add(_hotkeyBox);
 
             root.Controls.Add(Group(S.Options,
-                Stack(_chkEnabled, _chkFocused, _chkStartup, hotkeyRow, _hotkeyStatus)));
+                Stack(_chkEnabled, _chkFocused, _chkStartup, hotkeyRow, _hotkeyStatus, languageRow)));
 
             // --- Status -------------------------------------------------------------------------------
             _status = new Label { AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = new Padding(3, 6, 3, 0), Font = new Font(Font, FontStyle.Bold) };

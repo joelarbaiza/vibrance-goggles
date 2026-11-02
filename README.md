@@ -24,8 +24,8 @@ Vibrance Goggles fills that gap:
 - ⌨️ **Custom hotkey**: toggle vibrance on and off from inside the game (default `Ctrl + Alt + V`).
 - 🚀 **Start with Windows**, minimized to the tray.
 - 🧩 **No manual DLL copying**: the Intel interface is generated from your installed driver at startup.
-- 🔓 **No admin rights**, no installer, no background service. One small `.exe`.
-- 🌐 English and Spanish interface, based on your Windows language.
+- 🔓 **No admin rights** and no background service. Installer (`.msi`) or portable `.exe`.
+- 🌐 13 languages: English, Español, Português, Français, Deutsch, Italiano, Русский, Українська, Polski, Türkçe, 简体中文, 日本語, 한국어. Follows your Windows language or pick one in Options.
 - ♻️ Imports your game list from Color-Goggles on first run.
 
 ## Is it safe for anti-cheat?
@@ -34,9 +34,11 @@ Vibrance Goggles never touches the game process. It only changes the display col
 
 ## Install
 
-1. Download `VibranceGoggles-x.y.z.zip` from [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) and extract it anywhere.
-2. Run `VibranceGoggles.exe`.
-3. Click **Add game…**, pick your game from the list of open programs (or type its `.exe` name) and set its vibrance.
+1. Download **`VibranceGoggles-x.y.z.msi`** from [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) and run it. It installs for your user only (no admin prompt), adds a Start menu shortcut and opens the app.
+   Prefer no installer? Download `VibranceGoggles-x.y.z-portable.zip`, extract it anywhere and run `VibranceGoggles.exe`.
+2. Click **Add game…**, pick your game from the list of open programs (or type its `.exe` name) and set its vibrance.
+
+Uninstall from *Settings → Apps → Installed apps → Vibrance Goggles*.
 
 Requirements: Windows 10 (1903 or newer) or Windows 11, 64-bit, and the official Intel or AMD graphics driver. .NET Framework 4.8 is already part of Windows.
 
@@ -64,7 +66,10 @@ If no supported graphics are found, the window says so and details are written t
 git clone https://github.com/joelarbaiza/vibrance-goggles
 cd vibrance-goggles
 dotnet build src/VibranceGoggles/VibranceGoggles.csproj -c Release
+dotnet build installer -c Release -p:ProductVersion=1.0.0   # optional: the .msi (WiX Toolset 5)
 ```
+
+Releases are built by GitHub Actions: pushing a tag `vX.Y.Z` publishes the `.msi` and the portable `.zip`.
 
 Needs the .NET SDK (any recent version). The output targets .NET Framework 4.8, so it runs on any Windows 10/11 machine without installing a runtime.
 
@@ -87,8 +92,8 @@ Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) b
 - Saturación distinta para cada juego.
 - Atajo de teclado personalizable para activarla o desactivarla dentro del juego.
 - Se inicia con Windows, minimizado en la bandeja.
-- Sin copiar DLLs a mano, sin permisos de administrador, sin instalador.
+- Sin copiar DLLs a mano y sin permisos de administrador.
 - La ventana siempre se abre centrada.
-- Interfaz en español si tu Windows está en español.
+- 13 idiomas; usa el de tu Windows o elígelo en Opciones.
 
-**Instalación:** descarga el `.zip` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest), descomprímelo y ejecuta `VibranceGoggles.exe`. Pulsa **Agregar juego…**, elige el juego y ajusta su saturación.
+**Instalación:** descarga el instalador `.msi` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) y ejecútalo (no pide permisos de administrador). También hay una versión portable en `.zip`. Luego pulsa **Agregar juego…**, elige el juego y ajusta su saturación.

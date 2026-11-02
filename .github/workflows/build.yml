@@ -1,5 +1,8 @@
 name: Build
 
+# Every push builds the app and the installer.
+# Pushing a tag like v1.2.3 also publishes a GitHub Release with the .msi installer and a portable .zip.
+
 on:
   push:
     branches: [main]
@@ -19,25 +22,34 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build
-        run: dotnet build src/VibranceGoggles/VibranceGoggles.csproj -c Release -nologo
+      - name: Version
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}'.TrimStart('v') } else { '0.0.${{ github.run_number }}' }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build app
+        run: dotnet build src/VibranceGoggles/VibranceGoggles.csproj -c Release -nologo -p:Version=${{ env.VERSION }}
+
+      - name: Build installer (.msi)
+        run: dotnet build installer/VibranceGoggles.Installer.wixproj -c Release -nologo -p:ProductVersion=${{ env.VERSION }}
 
       - name: Package
         shell: pwsh
         run: |
-          $version = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}'.TrimStart('v') } else { 'dev' }
           New-Item -ItemType Directory -Force artifacts | Out-Null
-          $zip = "artifacts/VibranceGoggles-$version.zip"
-          Compress-Archive -Path src/VibranceGoggles/bin/Release/VibranceGoggles.exe, src/VibranceGoggles/bin/Release/VibranceGoggles.exe.config, LICENSE -DestinationPath $zip -Force
-          "ZIP=$zip" >> $env:GITHUB_ENV
+          Copy-Item "installer/bin/Release/VibranceGoggles-$env:VERSION.msi" artifacts/
+          Compress-Archive -Force -DestinationPath "artifacts/VibranceGoggles-$env:VERSION-portable.zip" `
+            -Path src/VibranceGoggles/bin/Release/VibranceGoggles.exe, src/VibranceGoggles/bin/Release/VibranceGoggles.exe.config, LICENSE
+          Get-ChildItem artifacts | Format-Table Name, Length
 
       - uses: actions/upload-artifact@v6
         with:
-          name: VibranceGoggles
-          path: ${{ env.ZIP }}
+          name: VibranceGoggles-${{ env.VERSION }}
+          path: artifacts/*
 
       - name: Publish release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" "${{ env.ZIP }}" --title "Vibrance Goggles ${{ github.ref_name }}" --generate-notes
+        run: gh release create "${{ github.ref_name }}" artifacts/* --title "Vibrance Goggles ${{ github.ref_name }}" --generate-notes

@@ -1,0 +1,18 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    Builds VibranceGoggles-<version>.msi from the app's Release output.
+    Build the app first, then:  dotnet build installer -c Release -p:ProductVersion=1.2.3
+  -->
+  <PropertyGroup>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AppDir>$(MSBuildThisFileDirectory)..\src\VibranceGoggles\bin\Release</AppDir>
+    <OutputName>VibranceGoggles-$(ProductVersion)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>ProductVersion=$(ProductVersion);AppDir=$(AppDir);AssetsDir=$(MSBuildThisFileDirectory)..\assets</DefineConstants>
+    <SuppressPdbOutput>true</SuppressPdbOutput>
+    <!-- ICE91: per-user files are intended; this package is always per-user. -->
+    <SuppressIces>ICE91</SuppressIces>
+  </PropertyGroup>
+
+</Project>

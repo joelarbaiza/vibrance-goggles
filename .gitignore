@@ -5,3 +5,5 @@ obj/
 *.suo
 artifacts/
 *.zip
+installer/bin/
+installer/obj/

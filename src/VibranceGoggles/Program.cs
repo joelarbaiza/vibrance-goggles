@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -16,6 +17,7 @@ namespace VibranceGoggles
         private static void Main(string[] args)
         {
             bool minimized = args.Any(a => string.Equals(a, Autostart.MinimizedArg, StringComparison.OrdinalIgnoreCase));
+            bool restart = false;
 
             using (var mutex = new Mutex(true, MutexName, out bool firstInstance))
             using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName))
@@ -32,6 +34,8 @@ namespace VibranceGoggles
                 Application.ThreadException += (s, e) => Log.Write("UI error: " + e.Exception);
 
                 AppSettings settings = AppSettings.Load();
+                S.Validate();
+                S.Init(settings.Language);
                 var gpu = new GpuManager();
 
                 using (var form = new MainForm(settings, gpu))
@@ -44,10 +48,14 @@ namespace VibranceGoggles
                     if (!minimized) form.ShowCentered();
 
                     Application.Run();
+                    restart = form.RestartRequested;
                 }
 
-                GC.KeepAlive(mutex);
+                mutex.ReleaseMutex();
             }
+
+            // Started only after the mutex is released, so the new copy becomes the main instance.
+            if (restart) Process.Start(Application.ExecutablePath);
         }
     }
 }
