@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for Vibrance Goggles releases.
+  Paste it into the SignPath project (Artifact configurations) once the project is approved;
+  SignPath validates it there. The GitHub workflow uploads one artifact (a ZIP made by
+  actions/upload-artifact) that contains the installer VibranceGoggles-<version>.msi.
+
+  Deep signing: the app .exe inside the MSI is signed first, then the MSI itself.
+  The workflow then extracts the signed .exe from the signed MSI for the portable .zip,
+  so each release needs a single signing approval.
+
+  product-name / product-version pin the metadata, as SignPath Foundation requires.
+  ${version} comes from the "version" parameter sent by the workflow (e.g. 1.2.1).
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <msi-file path="VibranceGoggles-*.msi">
+      <pe-file path="**/VibranceGoggles.exe" product-name="Vibrance Goggles" product-version="${version}">
+        <authenticode-sign/>
+      </pe-file>
+      <authenticode-sign/>
+    </msi-file>
+  </zip-file>
+</artifact-configuration>

@@ -58,7 +58,14 @@ Uninstall from *Settings → Apps → Installed apps → Vibrance Goggles*.
 
 Requirements: Windows 10 (1903 or newer) or Windows 11, 64-bit, and the official Intel or AMD graphics driver. .NET Framework 4.8 is already part of Windows.
 
-> **Windows SmartScreen** may warn the first time because the app is not code-signed. Click *More info → Run anyway*.
+### "Windows protected your PC"
+
+The first time you run the installer, Microsoft Defender SmartScreen may show **"Windows protected your PC"**. This appears for new apps that are not code-signed yet and have few downloads. It does not mean a virus was found.
+
+1. Click **More info**.
+2. Click **Run anyway**.
+
+You only need to do this once. If you prefer to check the file first, the source code and the build that produced each release are public: every `.msi` and `.zip` is built by [GitHub Actions](https://github.com/joelarbaiza/vibrance-goggles/actions) from this repository. Code signing is in progress (see [Code signing policy](#code-signing-policy)).
 
 ## Supported graphics
 
@@ -91,6 +98,19 @@ Needs the .NET SDK (any recent version). The output targets .NET Framework 4.8, 
 
 Settings live in `%APPDATA%\VibranceGoggles\settings.xml`.
 
+## Code signing policy
+
+Releases are built only by [GitHub Actions](.github/workflows/build.yml) from the source code in this repository. Code signing through the [SignPath Foundation](https://signpath.org) open source program has been requested; until it is approved, releases are not signed.
+
+- Committers and reviewers: [@joelarbaiza](https://github.com/joelarbaiza)
+- Approvers: [@joelarbaiza](https://github.com/joelarbaiza)
+
+Changes proposed by people who are not committers (pull requests) are reviewed before they are merged, and every signed release is approved manually.
+
+### Privacy policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. It has no telemetry and no update checks; the only link it opens is the GitHub page, and only when you click it. Settings are stored locally in `%APPDATA%\VibranceGoggles`.
+
 ## Credits
 
 Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) by Daniele Salvagni, which first showed that the Intel driver could do this. Vibrance Goggles is an independent rewrite and shares no code with it.
@@ -116,3 +136,5 @@ Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) b
 - 13 idiomas; usa el de tu Windows o elígelo en Opciones.
 
 **Instalación:** descarga el instalador `.msi` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) y ejecútalo (no pide permisos de administrador). También hay una versión portable en `.zip`. Luego pulsa **Agregar juego…**, elige el juego y ajusta su saturación.
+
+**Si aparece "Windows protegió su PC":** es el filtro SmartScreen de Microsoft Defender, que avisa con programas nuevos que todavía no están firmados digitalmente; no significa que tenga un virus. Haz clic en **Más información** y luego en **Ejecutar de todas formas**. Solo pasa la primera vez. Cada versión se compila de forma pública con GitHub Actions a partir de este código, y la firma digital está en trámite.

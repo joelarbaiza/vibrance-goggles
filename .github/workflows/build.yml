@@ -2,6 +2,11 @@ name: Build
 
 # Every push builds the app and the installer.
 # Pushing a tag like v1.2.3 also publishes a GitHub Release with the .msi installer and a portable .zip.
+#
+# Code signing (SignPath Foundation) turns on by itself once these exist in the repository settings:
+#   Secret    SIGNPATH_API_TOKEN
+#   Variables SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG
+# Without them, releases are built and published unsigned, exactly as before.
 
 on:
   push:
@@ -11,10 +16,13 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      SIGN: ${{ github.ref_type == 'tag' && secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -33,6 +41,53 @@ jobs:
 
       - name: Build installer (.msi)
         run: dotnet build installer/VibranceGoggles.Installer.wixproj -c Release -nologo -p:ProductVersion=${{ env.VERSION }}
+
+      # ---------------------------------------------------------------- code signing (tags only)
+
+      - name: Upload unsigned installer for signing
+        if: env.SIGN == 'true'
+        id: unsigned
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-installer
+          path: installer/bin/Release/VibranceGoggles-${{ env.VERSION }}.msi
+
+      - name: Sign with SignPath (needs manual approval)
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(env.VERSION) }}
+
+      - name: Use the signed installer and its signed .exe
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          $msi = "installer/bin/Release/VibranceGoggles-$env:VERSION.msi"
+          Copy-Item "signed/VibranceGoggles-$env:VERSION.msi" $msi -Force
+
+          # Administrative install = unpack the MSI without installing it, to get the signed .exe.
+          $unpacked = Join-Path $PWD 'unpacked'
+          Start-Process msiexec -Wait -ArgumentList '/a', "`"$(Resolve-Path $msi)`"", '/qn', "TARGETDIR=`"$unpacked`""
+          $exe = Get-ChildItem $unpacked -Recurse -Filter VibranceGoggles.exe | Select-Object -First 1
+          if (-not $exe) { throw 'Signed VibranceGoggles.exe not found inside the MSI' }
+          Copy-Item $exe.FullName src/VibranceGoggles/bin/Release/VibranceGoggles.exe -Force
+
+          foreach ($file in $msi, 'src/VibranceGoggles/bin/Release/VibranceGoggles.exe') {
+            $sig = Get-AuthenticodeSignature $file
+            "{0}: {1} ({2})" -f $file, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne 'Valid') { throw "$file is not validly signed" }
+          }
+
+      # ---------------------------------------------------------------- packaging
 
       - name: Package
         shell: pwsh
