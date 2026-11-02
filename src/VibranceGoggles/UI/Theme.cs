@@ -17,14 +17,27 @@ namespace VibranceGoggles.UI
 
         public static bool IsDark { get; private set; } = ReadIsDark();
 
-        public static Color Back => IsDark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
-        public static Color Surface => IsDark ? Color.FromArgb(45, 45, 45) : SystemColors.Window;
-        public static Color Text => IsDark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
-        public static Color SubtleText => IsDark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
+        // Windows 11-like palette: window < card < input, with an indigo accent taken from the icon.
+        public static Color Back => IsDark ? Color.FromArgb(28, 28, 28) : Color.FromArgb(243, 243, 243);
+        public static Color Card => IsDark ? Color.FromArgb(43, 43, 43) : Color.White;
+        public static Color CardBorder => IsDark ? Color.FromArgb(56, 56, 56) : Color.FromArgb(229, 229, 229);
+        public static Color Input => IsDark ? Color.FromArgb(52, 52, 52) : Color.FromArgb(251, 251, 251);
+        public static Color InputHover => IsDark ? Color.FromArgb(62, 62, 62) : Color.FromArgb(243, 243, 243);
+        public static Color InputPressed => IsDark ? Color.FromArgb(46, 46, 46) : Color.FromArgb(235, 235, 235);
+        public static Color InputBorder => IsDark ? Color.FromArgb(75, 75, 75) : Color.FromArgb(208, 208, 208);
+        public static Color Surface => Input;
+        public static Color Text => IsDark ? Color.FromArgb(240, 240, 240) : Color.FromArgb(27, 27, 27);
+        public static Color SubtleText => IsDark ? Color.FromArgb(160, 160, 160) : Color.FromArgb(110, 110, 110);
+        public static Color DisabledText => IsDark ? Color.FromArgb(105, 105, 105) : Color.FromArgb(170, 170, 170);
         public static Color ErrorText => IsDark ? Color.FromArgb(255, 110, 110) : Color.Firebrick;
-        public static Color Border => IsDark ? Color.FromArgb(70, 70, 70) : SystemColors.ControlDark;
-        public static Color Link => IsDark ? Color.FromArgb(110, 180, 255) : Color.FromArgb(0, 102, 204);
-        public static Color HeaderBack => IsDark ? Color.FromArgb(38, 38, 38) : SystemColors.Control;
+        public static Color Border => InputBorder;
+        public static Color Accent => IsDark ? Color.FromArgb(139, 128, 255) : Color.FromArgb(99, 91, 230);
+        public static Color AccentFill => IsDark ? Color.FromArgb(101, 88, 222) : Color.FromArgb(99, 91, 230);
+        public static Color Track => IsDark ? Color.FromArgb(90, 90, 90) : Color.FromArgb(200, 200, 200);
+        public static Color ThumbOuter => IsDark ? Color.FromArgb(69, 69, 69) : Color.White;
+        public static Color Link => IsDark ? Color.FromArgb(150, 140, 255) : Color.FromArgb(79, 70, 229);
+        public static Color HeaderBack => Input;
+        public static Color Selection => IsDark ? Color.FromArgb(62, 58, 100) : Color.FromArgb(226, 224, 252);
 
         /// <summary>Re-reads the Windows setting; returns true if it changed.</summary>
         public static bool Refresh()
@@ -82,29 +95,26 @@ namespace VibranceGoggles.UI
         {
             switch (c)
             {
+                case VibranceGoggles.UI.Card card:
+                    card.BackColor = Card;
+                    card.ForeColor = Text;
+                    card.Invalidate();
+                    break;
+                case RoundFrame frame:
+                    frame.BackColor = Input;
+                    frame.Invalidate();
+                    break;
+                case RoundButton _:
+                case ModernSlider _:
+                    c.Invalidate();
+                    break;
                 case LinkLabel link:
                     link.LinkColor = link.ActiveLinkColor = link.VisitedLinkColor = Link;
                     break;
                 case Label label:
                     label.ForeColor = Equals(label.Tag, Subtle) ? SubtleText : Equals(label.Tag, Error) ? ErrorText : Text;
                     break;
-                case Button button:
-                    if (IsDark)
-                    {
-                        button.FlatStyle = FlatStyle.Flat;
-                        button.BackColor = Surface;
-                        button.ForeColor = Text;
-                        button.FlatAppearance.BorderColor = Border;
-                        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 60, 60);
-                        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(75, 75, 75);
-                    }
-                    else
-                    {
-                        button.FlatStyle = FlatStyle.Standard;
-                        button.UseVisualStyleBackColor = true;
-                        button.ForeColor = SystemColors.ControlText;
-                    }
-                    break;
+
                 case ComboBox combo:
                     combo.FlatStyle = IsDark ? FlatStyle.Flat : FlatStyle.Standard;
                     combo.BackColor = Surface;
@@ -112,7 +122,8 @@ namespace VibranceGoggles.UI
                     break;
                 case TextBoxBase _:
                 case NumericUpDown _:
-                    c.BackColor = Surface;
+                case ListBox _:
+                    c.BackColor = Input;
                     c.ForeColor = Text;
                     break;
                 case ListView list:
@@ -120,12 +131,7 @@ namespace VibranceGoggles.UI
                     list.ForeColor = Text;
                     if (list.IsHandleCreated) SetWindowTheme(list.Handle, IsDark ? "DarkMode_Explorer" : "Explorer", null);
                     break;
-                case TrackBar track:
-                    track.BackColor = Back;
-                    break;
-                case GroupBox group:
-                    group.ForeColor = Text;
-                    break;
+
                 case CheckBox check:
                     check.ForeColor = Text;
                     break;

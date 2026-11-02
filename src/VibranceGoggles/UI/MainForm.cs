@@ -20,10 +20,11 @@ namespace VibranceGoggles.UI
         private readonly NotifyIcon _tray;
         private readonly ToolStripMenuItem _trayToggle;
         private readonly ContextMenuStrip _trayMenu;
+        private readonly ContextMenuStrip _languageMenu;
         private readonly VibranceSlider _desktopSlider;
         private readonly VibranceSlider _gameSlider;
         private readonly ListView _gameList;
-        private readonly Button _removeButton;
+        private readonly RoundButton _removeButton;
         private readonly CheckBox _chkEnabled, _chkFocused, _chkStartup;
         private readonly HotkeyBox _hotkeyBox;
         private readonly Label _hotkeyStatus;
@@ -69,13 +70,13 @@ namespace VibranceGoggles.UI
 
             // --- Desktop ------------------------------------------------------------------------------
             _desktopSlider = new VibranceSlider { Dock = DockStyle.Fill };
-            root.Controls.Add(Group(S.Desktop, _desktopSlider));
+            root.Controls.Add(new Card(S.Desktop, _desktopSlider));
 
             // --- Games --------------------------------------------------------------------------------
             _gameList = new ListView
             {
                 View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = false,
-                HeaderStyle = ColumnHeaderStyle.Nonclickable, Height = Dpi.Px(130), Dock = DockStyle.Fill,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable, BorderStyle = BorderStyle.None,
                 CheckBoxes = true, OwnerDraw = true, // Owner draw only to color the header in dark mode.
             };
             _gameList.Columns.Add(S.Game, Dpi.Px(290));
@@ -84,49 +85,62 @@ namespace VibranceGoggles.UI
             // Columns always fill the list, so no unpainted (white) header area is left on the right.
             _gameList.ClientSizeChanged += (s, e) =>
                 _gameList.Columns[0].Width = Math.Max(Dpi.Px(120), _gameList.ClientSize.Width - _gameList.Columns[1].Width);
-            _gameList.DrawItem += (s, e) => e.DrawDefault = true;
-            _gameList.DrawSubItem += (s, e) => e.DrawDefault = true;
+            _gameList.DrawItem += (s, e) => { }; // Rows are painted per cell in DrawGameCell.
+            _gameList.DrawSubItem += DrawGameCell;
+            _gameList.MouseMove += (s, e) => _gameList.Invalidate(); // Keep hover painting in sync.
+            var gameListFrame = new RoundFrame(_gameList, 3) { Height = Dpi.Px(124), Dock = DockStyle.Fill, Margin = new Padding(0), Cursor = Cursors.Default };
             var gamesHint = new Label { Text = S.GamesHint, AutoSize = true, Tag = Theme.Subtle, Margin = new Padding(3, 2, 3, 0) };
 
-            var addButton = new Button { Text = S.Add, AutoSize = true };
-            _removeButton = new Button { Text = S.Remove, AutoSize = true, Enabled = false };
-            var gameButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4) };
+            var addButton = new RoundButton { Text = S.Add, AutoSize = true, Primary = true, Margin = new Padding(0, 0, Dpi.Px(6), 0) };
+            _removeButton = new RoundButton { Text = S.Remove, AutoSize = true, Enabled = false };
+            var gameButtons = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4) };
             gameButtons.Controls.Add(addButton);
             gameButtons.Controls.Add(_removeButton);
 
             _gameSlider = new VibranceSlider { Dock = DockStyle.Fill, Enabled = false };
-            var gamesPanel = Stack(_gameList, gamesHint, gameButtons,
+            var gamesPanel = Stack(gameListFrame, gamesHint, gameButtons,
                 new Label { Text = S.SelectedGame, AutoSize = true, Margin = new Padding(3, 4, 3, 0) }, _gameSlider);
-            root.Controls.Add(Group(S.Games, gamesPanel));
+            root.Controls.Add(new Card(S.Games, gamesPanel));
 
             // --- Options ------------------------------------------------------------------------------
             _chkEnabled = new CheckBox { Text = S.Enabled, AutoSize = true };
             _chkFocused = new CheckBox { Text = S.OnlyFocused, AutoSize = true };
             _chkStartup = new CheckBox { Text = S.StartWithWindows, AutoSize = true };
 
-            var languageBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Dpi.Px(200) };
-            languageBox.Items.Add(S.LanguageAuto);
-            languageBox.Items.AddRange(S.NativeNames);
             int langIndex = Array.IndexOf(S.Codes, _settings.Language ?? "");
-            languageBox.SelectedIndex = langIndex >= 0 ? langIndex + 1 : 0;
-            languageBox.SelectedIndexChanged += (s, e) =>
+            var languageBox = new RoundButton
             {
-                _settings.Language = languageBox.SelectedIndex == 0 ? "" : S.Codes[languageBox.SelectedIndex - 1];
-                _settings.Save();
-                RestartRequested = true; // Rebuild the UI in the new language.
-                ExitApp();
+                Text = (langIndex >= 0 ? S.NativeNames[langIndex] : S.LanguageAuto) + "   ▾",
+                AutoSize = true, MinimumSize = new Size(Dpi.Px(190), Dpi.Px(30)),
             };
-            var languageRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
-            languageRow.Controls.Add(new Label { Text = S.Language + ":", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
+            _languageMenu = new ContextMenuStrip();
+            for (int i = -1; i < S.Codes.Length; i++)
+            {
+                string code = i < 0 ? "" : S.Codes[i];
+                var item = new ToolStripMenuItem(i < 0 ? S.LanguageAuto : S.NativeNames[i]) { Checked = i == langIndex };
+                item.Click += (s, e) =>
+                {
+                    if (code == (_settings.Language ?? "")) return;
+                    _settings.Language = code;
+                    _settings.Save();
+                    RestartRequested = true; // Rebuild the UI in the new language.
+                    BeginInvoke(new Action(ExitApp));
+                };
+                _languageMenu.Items.Add(item);
+            }
+            languageBox.Click += (s, e) => _languageMenu.Show(languageBox, new Point(0, languageBox.Height + Dpi.Px(2)));
+            var languageRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
+            languageRow.Controls.Add(new Label { Text = S.Language + ":", AutoSize = true, Margin = new Padding(3, Dpi.Px(7), 3, 0) });
             languageRow.Controls.Add(languageBox);
 
-            _hotkeyBox = new HotkeyBox { Width = Dpi.Px(170) };
+            _hotkeyBox = new HotkeyBox { BorderStyle = BorderStyle.None };
+            var hotkeyFrame = new RoundFrame(_hotkeyBox, 8) { Width = Dpi.Px(170), Height = Dpi.Px(30), Cursor = Cursors.Hand };
             _hotkeyStatus = new Label { AutoSize = true, Tag = Theme.Subtle, Text = S.HotkeyHint };
-            var hotkeyRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
-            hotkeyRow.Controls.Add(new Label { Text = S.Hotkey + ":", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 0) });
-            hotkeyRow.Controls.Add(_hotkeyBox);
+            var hotkeyRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
+            hotkeyRow.Controls.Add(new Label { Text = S.Hotkey + ":", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, Dpi.Px(7), 3, 0) });
+            hotkeyRow.Controls.Add(hotkeyFrame);
 
-            root.Controls.Add(Group(S.Options,
+            root.Controls.Add(new Card(S.Options,
                 Stack(_chkEnabled, _chkFocused, _chkStartup, hotkeyRow, _hotkeyStatus, languageRow)));
 
             // --- Status -------------------------------------------------------------------------------
@@ -345,13 +359,55 @@ namespace VibranceGoggles.UI
             TextRenderer.DrawText(e.Graphics, e.Header.Text, _gameList.Font, bounds, Theme.Text, flags);
         }
 
+        /// <summary>Paints a row cell: theme background, rounded accent checkbox, text.</summary>
+        private void DrawGameCell(object sender, DrawListViewSubItemEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            bool selected = e.Item.Selected;
+            Color back = selected ? Theme.Selection : Theme.Input;
+            using (var b = new SolidBrush(back)) g.FillRectangle(b, e.Bounds);
+
+            var game = (GameEntry)e.Item.Tag;
+            Color text = game.Enabled ? Theme.Text : Theme.SubtleText;
+            Rectangle textBounds = Rectangle.Inflate(e.Bounds, -Dpi.Px(6), 0);
+
+            if (e.ColumnIndex == 0)
+            {
+                int size = Dpi.Px(15);
+                var box = new Rectangle(e.Bounds.X + Dpi.Px(4), e.Bounds.Y + (e.Bounds.Height - size) / 2, size, size);
+                if (e.Item.Checked)
+                {
+                    Shapes.Fill(g, box, Dpi.Px(4), Theme.AccentFill);
+                    using (var p = new Pen(Color.White, Dpi.Px(2)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+                        g.DrawLines(p, new[]
+                        {
+                            new PointF(box.X + size * 0.25f, box.Y + size * 0.52f),
+                            new PointF(box.X + size * 0.43f, box.Y + size * 0.70f),
+                            new PointF(box.X + size * 0.76f, box.Y + size * 0.32f),
+                        });
+                }
+                else
+                {
+                    Shapes.Fill(g, box, Dpi.Px(4), Theme.Input, Theme.SubtleText);
+                }
+                textBounds = new Rectangle(box.Right + Dpi.Px(8), e.Bounds.Y, e.Bounds.Right - box.Right - Dpi.Px(12), e.Bounds.Height);
+            }
+
+            var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine |
+                        (e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left);
+            TextRenderer.DrawText(g, e.SubItem.Text, _gameList.Font, textBounds, text, flags);
+        }
+
         // =============================================================================== Theme / links
 
         private void ApplyTheme()
         {
             Theme.Apply(this);
-            _trayMenu.Renderer = Theme.MenuRenderer();
-            foreach (ToolStripItem i in _trayMenu.Items) i.ForeColor = Theme.IsDark ? Theme.Text : SystemColors.ControlText;
+            foreach (ContextMenuStrip menu in new[] { _trayMenu, _languageMenu })
+            {
+                menu.Renderer = Theme.MenuRenderer();
+                foreach (ToolStripItem i in menu.Items) i.ForeColor = Theme.Text;
+            }
             foreach (ListViewItem item in _gameList.Items) StyleItem(item);
             _gameList.Invalidate();
         }
@@ -461,21 +517,10 @@ namespace VibranceGoggles.UI
 
         // =============================================================================== Layout helpers
 
-        private static GroupBox Group(string title, Control content)
-        {
-            var box = new GroupBox
-            {
-                Text = title, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Dock = DockStyle.Fill, Padding = new Padding(8, 6, 8, 8), Margin = new Padding(0, 0, 0, 8),
-            };
-            content.Dock = DockStyle.Fill;
-            box.Controls.Add(content);
-            return box;
-        }
 
         private static TableLayoutPanel Stack(params Control[] controls)
         {
-            var panel = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, Margin = new Padding(0) };
+            var panel = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0) };
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             foreach (Control c in controls) panel.Controls.Add(c);
             return panel;
@@ -487,6 +532,7 @@ namespace VibranceGoggles.UI
             {
                 Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
                 _tray?.Dispose();
+                _languageMenu?.Dispose();
                 _engine?.Dispose();
             }
             base.Dispose(disposing);

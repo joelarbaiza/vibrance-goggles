@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -9,14 +10,15 @@ namespace VibranceGoggles.UI
     /// <summary>Pick a running program (or type an .exe name) to add to the game list.</summary>
     internal sealed class AddGameDialog : Form
     {
-        private readonly ComboBox _combo;
+        private readonly TextBox _name;
+        private readonly ListBox _running;
 
         public string ProcessFile { get; private set; }
 
         public AddGameDialog()
         {
             AutoScaleMode = AutoScaleMode.None;
-            Font = System.Drawing.SystemFonts.MessageBoxFont;
+            Font = SystemFonts.MessageBoxFont;
             Text = S.AddTitle;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
@@ -26,26 +28,34 @@ namespace VibranceGoggles.UI
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
             Padding = new Padding(Dpi.Px(12));
 
-            var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
-            layout.Controls.Add(new Label { Text = S.AddPrompt, AutoSize = true, Margin = new Padding(0, 0, 0, 6) });
+            var layout = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Dock = DockStyle.Fill };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Dpi.Px(340)));
+            layout.Controls.Add(new Label { Text = S.AddPrompt, AutoSize = true, Margin = new Padding(0, 0, 0, Dpi.Px(6)) });
 
-            _combo = new ComboBox
+            string[] programs = RunningWindowedPrograms();
+
+            _name = new TextBox
             {
-                Width = Dpi.Px(320),
-                DropDownStyle = ComboBoxStyle.DropDown,
+                BorderStyle = BorderStyle.None,
                 AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-                AutoCompleteSource = AutoCompleteSource.ListItems,
+                AutoCompleteSource = AutoCompleteSource.CustomSource,
             };
-            _combo.Items.AddRange(RunningWindowedPrograms());
-            layout.Controls.Add(_combo);
+            _name.AutoCompleteCustomSource.AddRange(programs);
+            layout.Controls.Add(new RoundFrame(_name, 8) { Height = Dpi.Px(30), Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, Dpi.Px(8)) });
+
+            _running = new ListBox { BorderStyle = BorderStyle.None, IntegralHeight = false };
+            _running.Items.AddRange(programs.Cast<object>().ToArray());
+            _running.SelectedIndexChanged += (s, e) => { if (_running.SelectedItem != null) _name.Text = (string)_running.SelectedItem; };
+            _running.DoubleClick += (s, e) => Accept();
+            layout.Controls.Add(new RoundFrame(_running, 4) { Height = Dpi.Px(170), Dock = DockStyle.Fill, Margin = new Padding(0), Cursor = Cursors.Default });
 
             var buttons = new FlowLayoutPanel
             {
-                FlowDirection = FlowDirection.RightToLeft, AutoSize = true,
-                Dock = DockStyle.Fill, Margin = new Padding(0, 10, 0, 0),
+                FlowDirection = FlowDirection.RightToLeft, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Fill, Margin = new Padding(0, Dpi.Px(12), 0, 0),
             };
-            var cancel = new Button { Text = S.Cancel, DialogResult = DialogResult.Cancel, AutoSize = true };
-            var ok = new Button { Text = S.Ok, AutoSize = true };
+            var cancel = new RoundButton { Text = S.Cancel, DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(Dpi.Px(90), Dpi.Px(30)) };
+            var ok = new RoundButton { Text = S.Ok, AutoSize = true, Primary = true, MinimumSize = new Size(Dpi.Px(90), Dpi.Px(30)), Margin = new Padding(0, 0, Dpi.Px(6), 0) };
             ok.Click += (s, e) => Accept();
             buttons.Controls.Add(cancel);
             buttons.Controls.Add(ok);
@@ -62,12 +72,19 @@ namespace VibranceGoggles.UI
             Theme.Apply(this);
         }
 
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            Theme.Apply(this);
+            _name.Focus();
+        }
+
         private void Accept()
         {
-            string name = Path.GetFileName(_combo.Text.Trim());
+            string name = Path.GetFileName(_name.Text.Trim());
             if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             {
-                _combo.Focus();
+                _name.Focus();
                 return;
             }
             if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name += ".exe";
@@ -75,7 +92,7 @@ namespace VibranceGoggles.UI
             DialogResult = DialogResult.OK;
         }
 
-        private static object[] RunningWindowedPrograms()
+        private static string[] RunningWindowedPrograms()
         {
             int self = Process.GetCurrentProcess().Id;
             return Process.GetProcesses()
@@ -83,7 +100,6 @@ namespace VibranceGoggles.UI
                 .Select(p => p.ProcessName + ".exe")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .Cast<object>()
                 .ToArray();
         }
 
