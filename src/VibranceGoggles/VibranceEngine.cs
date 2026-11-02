@@ -72,15 +72,16 @@ namespace VibranceGoggles
 
         private GameEntry FindActiveGame()
         {
-            if (_settings.Games.Count == 0) return null;
+            if (!_settings.Games.Any(g => g.Enabled)) return null;
 
             GameEntry foreground = _settings.FindGame(ForegroundProcessName());
+            if (foreground != null && !foreground.Enabled) foreground = null;
             if (foreground != null || _settings.OnlyWhenFocused) return foreground;
 
             // "Always" mode: any listed game that is running counts, in list order.
             var running = Process.GetProcesses().Select(p => p.ProcessName)
                 .ToLookup(n => n, StringComparer.OrdinalIgnoreCase);
-            return _settings.Games.FirstOrDefault(g => running.Contains(g.ProcessName));
+            return _settings.Games.FirstOrDefault(g => g.Enabled && running.Contains(g.ProcessName));
         }
 
         private static string ForegroundProcessName()

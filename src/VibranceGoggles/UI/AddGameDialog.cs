@@ -56,6 +56,12 @@ namespace VibranceGoggles.UI
             CancelButton = cancel;
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            Theme.Apply(this);
+        }
+
         private void Accept()
         {
             string name = Path.GetFileName(_combo.Text.Trim());

@@ -19,6 +19,7 @@ namespace VibranceGoggles.UI
 
         private readonly NotifyIcon _tray;
         private readonly ToolStripMenuItem _trayToggle;
+        private readonly ContextMenuStrip _trayMenu;
         private readonly VibranceSlider _desktopSlider;
         private readonly VibranceSlider _gameSlider;
         private readonly ListView _gameList;
@@ -62,7 +63,7 @@ namespace VibranceGoggles.UI
                 MaximumSize = new Size(Dpi.Px(420), 0),
                 Margin = new Padding(3, 0, 3, 8),
                 Text = gpu.HasGpu ? $"{S.Graphics}: {gpu.Description}" : S.NoGpu,
-                ForeColor = gpu.HasGpu ? SystemColors.GrayText : Color.Firebrick,
+                Tag = gpu.HasGpu ? Theme.Subtle : Theme.Error,
             };
             root.Controls.Add(gpuLabel);
 
@@ -75,9 +76,17 @@ namespace VibranceGoggles.UI
             {
                 View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = false,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable, Height = Dpi.Px(130), Dock = DockStyle.Fill,
+                CheckBoxes = true, OwnerDraw = true, // Owner draw only to color the header in dark mode.
             };
             _gameList.Columns.Add(S.Game, Dpi.Px(290));
             _gameList.Columns.Add(S.Vibrance, Dpi.Px(90), HorizontalAlignment.Right);
+            _gameList.DrawColumnHeader += DrawListHeader;
+            // Columns always fill the list, so no unpainted (white) header area is left on the right.
+            _gameList.ClientSizeChanged += (s, e) =>
+                _gameList.Columns[0].Width = Math.Max(Dpi.Px(120), _gameList.ClientSize.Width - _gameList.Columns[1].Width);
+            _gameList.DrawItem += (s, e) => e.DrawDefault = true;
+            _gameList.DrawSubItem += (s, e) => e.DrawDefault = true;
+            var gamesHint = new Label { Text = S.GamesHint, AutoSize = true, Tag = Theme.Subtle, Margin = new Padding(3, 2, 3, 0) };
 
             var addButton = new Button { Text = S.Add, AutoSize = true };
             _removeButton = new Button { Text = S.Remove, AutoSize = true, Enabled = false };
@@ -86,7 +95,7 @@ namespace VibranceGoggles.UI
             gameButtons.Controls.Add(_removeButton);
 
             _gameSlider = new VibranceSlider { Dock = DockStyle.Fill, Enabled = false };
-            var gamesPanel = Stack(_gameList, gameButtons,
+            var gamesPanel = Stack(_gameList, gamesHint, gameButtons,
                 new Label { Text = S.SelectedGame, AutoSize = true, Margin = new Padding(3, 4, 3, 0) }, _gameSlider);
             root.Controls.Add(Group(S.Games, gamesPanel));
 
@@ -112,7 +121,7 @@ namespace VibranceGoggles.UI
             languageRow.Controls.Add(languageBox);
 
             _hotkeyBox = new HotkeyBox { Width = Dpi.Px(170) };
-            _hotkeyStatus = new Label { AutoSize = true, ForeColor = SystemColors.GrayText, Text = S.HotkeyHint };
+            _hotkeyStatus = new Label { AutoSize = true, Tag = Theme.Subtle, Text = S.HotkeyHint };
             var hotkeyRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 0) };
             hotkeyRow.Controls.Add(new Label { Text = S.Hotkey + ":", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 3, 0) });
             hotkeyRow.Controls.Add(_hotkeyBox);
@@ -123,6 +132,21 @@ namespace VibranceGoggles.UI
             // --- Status -------------------------------------------------------------------------------
             _status = new Label { AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = new Padding(3, 6, 3, 0), Font = new Font(Font, FontStyle.Bold) };
             root.Controls.Add(_status);
+
+            // --- Footer: repo link + version --------------------------------------------------------
+            var star = new LinkLabel { Text = S.Star, AutoSize = true, Anchor = AnchorStyles.Left, LinkBehavior = LinkBehavior.HoverUnderline };
+            star.LinkClicked += (s, e) => OpenRepo();
+            var version = new Label
+            {
+                Text = $"v{Application.ProductVersion.Split('+')[0]} · @joelarbaiza",
+                AutoSize = true, Anchor = AnchorStyles.Right, Tag = Theme.Subtle,
+            };
+            var footer = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, Dpi.Px(8), 0, 0) };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            footer.Controls.Add(star, 0, 0);
+            footer.Controls.Add(version, 1, 0);
+            root.Controls.Add(footer);
 
             Controls.Add(root);
             ResumeLayout(true);
@@ -135,6 +159,7 @@ namespace VibranceGoggles.UI
             trayMenu.Items.Add(_trayToggle);
             trayMenu.Items.Add(new ToolStripSeparator());
             trayMenu.Items.Add(S.Exit, null, (s, e) => ExitApp());
+            _trayMenu = trayMenu;
             _tray = new NotifyIcon { Icon = Icon, Text = S.AppName, ContextMenuStrip = trayMenu, Visible = true };
             _tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowCentered(); };
 
@@ -150,11 +175,14 @@ namespace VibranceGoggles.UI
 
             _hotkeyBox.HotkeyChanged += (s, e) => { _settings.Hotkey = (int)_hotkeyBox.Hotkey; _settings.Save(); RegisterToggleHotkey(); };
             _engine.StateChanged += (s, e) => UpdateStatus();
+            _gameList.ItemChecked += (s, e) => OnGameChecked(e.Item);
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
             LoadValues();
             if (_settings.StartWithWindows) ApplyAutostart(); // Keep the path current if the exe moved.
 
             CreateHandle(); // Needed for the hotkey even while hidden in the tray.
+            ApplyTheme();
             RegisterToggleHotkey();
             _engine.Start();
         }
@@ -279,8 +307,72 @@ namespace VibranceGoggles.UI
 
         // =============================================================================== Games
 
-        private static ListViewItem ItemFor(GameEntry game) =>
-            new ListViewItem(new[] { game.Process, game.Vibrance + " %" }) { Tag = game };
+        private static ListViewItem ItemFor(GameEntry game)
+        {
+            var item = new ListViewItem(new[] { game.Process, game.Vibrance + " %" }) { Tag = game, Checked = game.Enabled };
+            StyleItem(item);
+            return item;
+        }
+
+        private static void StyleItem(ListViewItem item)
+        {
+            bool enabled = ((GameEntry)item.Tag).Enabled;
+            item.UseItemStyleForSubItems = true;
+            item.ForeColor = enabled ? Theme.Text : Theme.SubtleText;
+            item.BackColor = Theme.Surface;
+        }
+
+        private void OnGameChecked(ListViewItem item)
+        {
+            if (_loading || !(item.Tag is GameEntry game) || game.Enabled == item.Checked) return;
+            game.Enabled = item.Checked;
+            StyleItem(item);
+            SaveAndRefresh();
+        }
+
+        private void DrawListHeader(object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            using (var back = new SolidBrush(Theme.HeaderBack))
+            using (var line = new Pen(Theme.Border))
+            {
+                e.Graphics.FillRectangle(back, e.Bounds);
+                e.Graphics.DrawLine(line, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                e.Graphics.DrawLine(line, e.Bounds.Right - 1, e.Bounds.Top + 4, e.Bounds.Right - 1, e.Bounds.Bottom - 5);
+            }
+            var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+                        (e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left);
+            var bounds = Rectangle.Inflate(e.Bounds, -Dpi.Px(6), 0);
+            TextRenderer.DrawText(e.Graphics, e.Header.Text, _gameList.Font, bounds, Theme.Text, flags);
+        }
+
+        // =============================================================================== Theme / links
+
+        private void ApplyTheme()
+        {
+            Theme.Apply(this);
+            _trayMenu.Renderer = Theme.MenuRenderer();
+            foreach (ToolStripItem i in _trayMenu.Items) i.ForeColor = Theme.IsDark ? Theme.Text : SystemColors.ControlText;
+            foreach (ListViewItem item in _gameList.Items) StyleItem(item);
+            _gameList.Invalidate();
+        }
+
+        private void OnUserPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+        {
+            // Raised on a system thread when Windows switches between light and dark.
+            if (Theme.Refresh() && IsHandleCreated) BeginInvoke(new Action(ApplyTheme));
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ApplyTheme(); // Child handles exist now (list scrollbars, title bar).
+        }
+
+        private static void OpenRepo()
+        {
+            try { Process.Start("https://github.com/joelarbaiza/vibrance-goggles"); }
+            catch (Exception ex) { Log.Write("Could not open browser: " + ex.Message); }
+        }
 
         private GameEntry SelectedGame => _gameList.SelectedItems.Count > 0 ? (GameEntry)_gameList.SelectedItems[0].Tag : null;
 
@@ -362,7 +454,8 @@ namespace VibranceGoggles.UI
             }
 
             _hotkeyStatus.Text = ok ? S.HotkeyHint : S.HotkeyBusy;
-            _hotkeyStatus.ForeColor = ok ? SystemColors.GrayText : Color.Firebrick;
+            _hotkeyStatus.Tag = ok ? Theme.Subtle : Theme.Error;
+            Theme.Style(_hotkeyStatus);
             UpdateToggleTexts();
         }
 
@@ -392,6 +485,7 @@ namespace VibranceGoggles.UI
         {
             if (disposing)
             {
+                Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
                 _tray?.Dispose();
                 _engine?.Dispose();
             }

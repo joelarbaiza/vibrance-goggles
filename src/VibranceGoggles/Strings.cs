@@ -68,6 +68,9 @@ namespace VibranceGoggles
         public static string AddPrompt => T(nameof(AddPrompt));
         public static string Ok => T(nameof(Ok));
         public static string Cancel => T(nameof(Cancel));
+        public static string ResetTip => T(nameof(ResetTip));
+        public static string Star => T(nameof(Star));
+        public static string GamesHint => T(nameof(GamesHint));
 
         // Column order = Codes: en, es, pt, fr, de, it, ru, uk, pl, tr, zh, ja, ko
         private static readonly Dictionary<string, string[]> Table = new Dictionary<string, string[]>
@@ -149,6 +152,9 @@ namespace VibranceGoggles
             },
             [nameof(Ok)] = new[] { "OK", "Aceptar", "OK", "OK", "OK", "OK", "ОК", "OK", "OK", "Tamam", "确定", "OK", "확인" },
             [nameof(Cancel)] = new[] { "Cancel", "Cancelar", "Cancelar", "Annuler", "Abbrechen", "Annulla", "Отмена", "Скасувати", "Anuluj", "İptal", "取消", "キャンセル", "취소" },
+            [nameof(ResetTip)] = new[] { "Reset to 100%", "Restablecer a 100%", "Restaurar para 100%", "Réinitialiser à 100 %", "Auf 100 % zurücksetzen", "Ripristina a 100%", "Сбросить до 100%", "Скинути до 100%", "Przywróć 100%", "%100'e sıfırla", "重置为 100%", "100% にリセット", "100%로 초기화" },
+            [nameof(Star)] = new[] { "Star on GitHub ★", "Danos una ★ en GitHub", "Dê uma ★ no GitHub", "Mettez une ★ sur GitHub", "Auf GitHub mit ★ bewerten", "Lascia una ★ su GitHub", "Поставьте ★ на GitHub", "Поставте ★ на GitHub", "Daj ★ na GitHubie", "GitHub'da ★ verin", "在 GitHub 上点 ★", "GitHub で ★ を付ける", "GitHub에서 ★ 주기" },
+            [nameof(GamesHint)] = new[] { "Uncheck a game to pause it", "Desmarca un juego para pausarlo", "Desmarque um jogo para pausá-lo", "Décochez un jeu pour le mettre en pause", "Haken entfernen, um ein Spiel zu pausieren", "Deseleziona un gioco per sospenderlo", "Снимите флажок, чтобы приостановить игру", "Зніміть позначку, щоб призупинити гру", "Odznacz grę, aby ją wstrzymać", "Duraklatmak için oyunun işaretini kaldırın", "取消勾选可暂停该游戏", "チェックを外すとそのゲームを一時停止", "체크를 해제하면 해당 게임을 일시 중지합니다" },
         };
 
         /// <summary>Catches a missing translation at startup in Debug builds.</summary>

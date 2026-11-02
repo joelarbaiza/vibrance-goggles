@@ -17,6 +17,9 @@ namespace VibranceGoggles
         /// <summary>Vibrance in percent while this game is active.</summary>
         [XmlAttribute] public int Vibrance { get; set; } = 150;
 
+        /// <summary>Unchecked games stay in the list but are ignored.</summary>
+        [XmlAttribute] public bool Enabled { get; set; } = true;
+
         /// <summary>Process name without extension, as reported by Windows.</summary>
         [XmlIgnore]
         public string ProcessName => Path.GetFileNameWithoutExtension(Process ?? "");
