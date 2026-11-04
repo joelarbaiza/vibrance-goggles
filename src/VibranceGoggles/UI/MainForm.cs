@@ -175,7 +175,21 @@ namespace VibranceGoggles.UI
             _removeButton.Click += (s, e) => RemoveGame();
             _chkEnabled.CheckedChanged += (s, e) => { if (!_loading) SetEnabled(_chkEnabled.Checked, notify: false); };
             _chkFocused.CheckedChanged += (s, e) => { if (_loading) return; _settings.OnlyWhenFocused = _chkFocused.Checked; SaveAndRefresh(); };
-            _chkStartup.CheckedChanged += (s, e) => { if (_loading) return; _settings.StartWithWindows = _chkStartup.Checked; ApplyAutostart(); _settings.Save(); };
+            _chkStartup.CheckedChanged += (s, e) =>
+            {
+                if (_loading) return;
+                if (PackagedApp.IsPackaged)
+                {
+                    // Run after the click has been handled: the startup task API is a COM call that Windows
+                    // refuses while the window is still processing a synchronous message (RPC_E_CANTCALLOUT_ININPUTSYNCCALL).
+                    bool wanted = _chkStartup.Checked;
+                    BeginInvoke(new Action(() => ApplyAutostartPackaged(wanted)));
+                    return;
+                }
+                _settings.StartWithWindows = _chkStartup.Checked;
+                _settings.Save();
+                ApplyAutostart();
+            };
 
             _hotkeyBox.HotkeyChanged += (s, e) => { _settings.Hotkey = (int)_hotkeyBox.Hotkey; _settings.Save(); RegisterToggleHotkey(); };
             _engine.StateChanged += (s, e) => UpdateStatus();
@@ -183,7 +197,8 @@ namespace VibranceGoggles.UI
             Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
             LoadValues();
-            if (_settings.StartWithWindows) ApplyAutostart(); // Keep the path current if the exe moved.
+            if (PackagedApp.IsPackaged) SyncAutostartFromWindows();
+            else if (_settings.StartWithWindows) ApplyAutostart(); // Keep the path current if the exe moved.
 
             CreateHandle(); // Needed for the hotkey even while hidden in the tray.
             ApplyTheme();
@@ -490,10 +505,41 @@ namespace VibranceGoggles.UI
 
         // =============================================================================== System
 
-        private void ApplyAutostart()
+        /// <summary>Applies the "start with Windows" setting; if Windows refuses, shows the real state.</summary>
+        private void ApplyAutostart() => ApplyAutostartCore(_settings.StartWithWindows);
+
+        private void ApplyAutostartPackaged(bool wanted) => ApplyAutostartCore(wanted);
+
+        private async void ApplyAutostartCore(bool wanted)
         {
-            try { Autostart.Apply(_settings.StartWithWindows); }
-            catch (Exception ex) { Log.Write("Autostart failed: " + ex.Message); }
+            bool actual;
+            try { actual = await Autostart.SetAsync(wanted); }
+            catch (Exception ex) { Log.Write("Autostart failed: " + ex.Message); actual = false; }
+            if (IsDisposed || actual == wanted) return;
+
+            // Store version: the user turned the startup task off in Windows Settings, so only they can turn it back on.
+            ShowAutostartState(actual);
+            if (wanted) _tray.ShowBalloonTip(5000, S.AppName, S.StartupBlocked, ToolTipIcon.Info);
+        }
+
+        /// <summary>Store version: show the startup task state Windows has (the user may change it in Settings).</summary>
+        private async void SyncAutostartFromWindows()
+        {
+            bool? actual = await Autostart.IsEnabledAsync();
+            if (actual.HasValue && actual.Value != _chkStartup.Checked && !IsDisposed) ShowAutostartState(actual.Value);
+        }
+
+        private void ShowAutostartState(bool on)
+        {
+            // Store version: Windows keeps the startup state; settings.xml (shared with a classic install) is left alone.
+            if (!PackagedApp.IsPackaged)
+            {
+                _settings.StartWithWindows = on;
+                _settings.Save();
+            }
+            _loading = true;
+            _chkStartup.Checked = on;
+            _loading = false;
         }
 
         private void RegisterToggleHotkey()

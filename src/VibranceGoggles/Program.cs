@@ -16,7 +16,8 @@ namespace VibranceGoggles
         [STAThread]
         private static void Main(string[] args)
         {
-            bool minimized = args.Any(a => string.Equals(a, Autostart.MinimizedArg, StringComparison.OrdinalIgnoreCase));
+            bool minimized = args.Any(a => string.Equals(a, Autostart.MinimizedArg, StringComparison.OrdinalIgnoreCase))
+                             || PackagedApp.LaunchedAtStartup(); // Store version started by Windows at sign-in.
             bool restart = false;
 
             using (var mutex = new Mutex(true, MutexName, out bool firstInstance))

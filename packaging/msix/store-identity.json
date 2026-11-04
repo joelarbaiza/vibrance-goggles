@@ -1,0 +1,6 @@
+{
+  "_comment": "Replace with the values from Partner Center → your app → Product management → Product identity. Until then, these test values build a package that only installs with a self-signed test certificate.",
+  "IdentityName": "JoelArbaiza.VibranceGoggles",
+  "Publisher": "CN=VibranceGogglesTest",
+  "PublisherDisplayName": "Joel Arbaiza"
+}

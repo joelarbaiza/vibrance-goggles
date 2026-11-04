@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the Microsoft Store version. tools/build-msix.ps1 fills the $...$ values:
+  identity values come from packaging/msix/store-identity.json (Partner Center → Product identity).
+  The Store signs the package; no certificate of our own is needed.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 rescap">
+
+  <Identity Name="$IdentityName$" Publisher="$Publisher$" Version="$Version$" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Vibrance Goggles</DisplayName>
+    <PublisherDisplayName>$PublisherDisplayName$</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="es-es" />
+  </Resources>
+
+  <Applications>
+    <Application Id="VibranceGoggles" Executable="VibranceGoggles.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Vibrance Goggles"
+        Description="Digital vibrance for Intel and AMD integrated graphics."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- "Start with Windows": off until the user ticks it in the app (Autostart.cs). -->
+        <uap5:Extension Category="windows.startupTask" Executable="VibranceGoggles.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask TaskId="VibranceGogglesStartup" Enabled="false" DisplayName="Vibrance Goggles" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Classic desktop app (WinForms) running with normal user rights. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

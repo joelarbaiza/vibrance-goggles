@@ -87,6 +87,19 @@ jobs:
             if ($sig.Status -ne 'Valid') { throw "$file is not validly signed" }
           }
 
+      # ---------------------------------------------------------------- Microsoft Store package
+
+      - name: Build Store package (.msix)
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/build-msix.ps1 -Version $env:VERSION
+
+      # Upload this file in Partner Center; the Store signs it. It is not attached to the GitHub release
+      # because an unsigned MSIX cannot be installed directly.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: VibranceGoggles-${{ env.VERSION }}-store-msix
+          path: packaging/msix/out/VibranceGoggles-${{ env.VERSION }}.msix
+
       # ---------------------------------------------------------------- packaging
 
       - name: Package

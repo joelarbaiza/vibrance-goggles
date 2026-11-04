@@ -36,4 +36,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.26100.9457" />
+  </ItemGroup>
+
 </Project>

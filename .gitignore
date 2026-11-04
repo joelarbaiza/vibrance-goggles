@@ -7,3 +7,5 @@ artifacts/
 *.zip
 installer/bin/
 installer/obj/
+packaging/msix/out/
+packaging/msix/stage/
