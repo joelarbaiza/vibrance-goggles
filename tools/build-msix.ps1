@@ -36,6 +36,14 @@ Copy-Item (Join-Path $msix 'Assets') $stage -Recurse
     Replace('$Version$', $fullVersion) |
     Set-Content (Join-Path $stage 'AppxManifest.xml') -Encoding UTF8
 
+# Resource index: lets Windows pick the right icon size and the "unplated" (no colored square) variants.
+$makepri = Join-Path $makeappx.DirectoryName 'makepri.exe'
+$priConfig = Join-Path $msix 'priconfig.xml'
+& $makepri createconfig /cf $priConfig /dq en-US /o | Out-Null
+& $makepri new /pr $stage /cf $priConfig /mn (Join-Path $stage 'AppxManifest.xml') /of (Join-Path $stage 'resources.pri') /o | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "makepri failed ($LASTEXITCODE)" }
+Remove-Item $priConfig
+
 $package = Join-Path $outDir "VibranceGoggles-$Version.msix"
 & $makeappx.FullName pack /d $stage /p $package /o
 if ($LASTEXITCODE -ne 0) { throw "makeappx failed ($LASTEXITCODE)" }
