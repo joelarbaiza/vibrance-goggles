@@ -65,7 +65,7 @@ The first time you run the installer, Microsoft Defender SmartScreen may show **
 1. Click **More info**.
 2. Click **Run anyway**.
 
-You only need to do this once. If you prefer to check the file first, the source code and the build that produced each release are public: every `.msi` and `.zip` is built by [GitHub Actions](https://github.com/joelarbaiza/vibrance-goggles/actions) from this repository. Code signing is in progress (see [Code signing policy](#code-signing-policy)).
+You only need to do this once. If you prefer to check the file first, the source code and the build that produced each release are public: every `.msi` and `.zip` is built by [GitHub Actions](https://github.com/joelarbaiza/vibrance-goggles/actions) from this repository. Releases are not code-signed yet (see [Code signing policy](#code-signing-policy)).
 
 ## Supported graphics
 
@@ -100,7 +100,7 @@ Settings live in `%APPDATA%\VibranceGoggles\settings.xml`.
 
 ## Code signing policy
 
-Releases are built only by [GitHub Actions](.github/workflows/build.yml) from the source code in this repository. Code signing through the [SignPath Foundation](https://signpath.org) open source program has been requested; until it is approved, releases are not signed.
+Releases are built only by [GitHub Actions](.github/workflows/build.yml) from the source code in this repository. Releases are currently not code-signed; the release workflow is ready to sign them once a code signing certificate is available.
 
 - Committers and reviewers: [@joelarbaiza](https://github.com/joelarbaiza)
 - Approvers: [@joelarbaiza](https://github.com/joelarbaiza)
@@ -137,4 +137,4 @@ Inspired by [Color-Goggles](https://github.com/daniele-salvagni/color-goggles) b
 
 **Instalación:** descarga el instalador `.msi` de [Releases](https://github.com/joelarbaiza/vibrance-goggles/releases/latest) y ejecútalo (no pide permisos de administrador). También hay una versión portable en `.zip`. Luego pulsa **Agregar juego…**, elige el juego y ajusta su saturación.
 
-**Si aparece "Windows protegió su PC":** es el filtro SmartScreen de Microsoft Defender, que avisa con programas nuevos que todavía no están firmados digitalmente; no significa que tenga un virus. Haz clic en **Más información** y luego en **Ejecutar de todas formas**. Solo pasa la primera vez. Cada versión se compila de forma pública con GitHub Actions a partir de este código, y la firma digital está en trámite.
+**Si aparece "Windows protegió su PC":** es el filtro SmartScreen de Microsoft Defender, que avisa con programas nuevos que todavía no están firmados digitalmente; no significa que tenga un virus. Haz clic en **Más información** y luego en **Ejecutar de todas formas**. Solo pasa la primera vez. Cada versión se compila de forma pública con GitHub Actions a partir de este código; por ahora no está firmada digitalmente.
