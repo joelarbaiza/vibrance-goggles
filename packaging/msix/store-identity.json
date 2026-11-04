@@ -1,6 +1,6 @@
 {
-  "_comment": "Replace with the values from Partner Center → your app → Product management → Product identity. Until then, these test values build a package that only installs with a self-signed test certificate.",
+  "_comment": "Values from Partner Center → Vibrance Goggles → Product management → Product identity (Store ID 9P8Q7TVDRF57). Package Family Name: JoelArbaiza.VibranceGoggles_hdspna8c8tkcw",
   "IdentityName": "JoelArbaiza.VibranceGoggles",
-  "Publisher": "CN=VibranceGogglesTest",
+  "Publisher": "CN=663B94F1-A4FB-4B26-96F8-98F99B567C59",
   "PublisherDisplayName": "Joel Arbaiza"
 }
